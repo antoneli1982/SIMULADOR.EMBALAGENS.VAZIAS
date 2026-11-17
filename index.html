@@ -58007,7 +58007,7 @@ function aimHands(p,targetWorld,width=.42){
  }
 }
 function breathePerson(p,t,phase=0){const wave=Math.sin(t*1.7+phase);p.body.position.y=.84+wave*.003;if(p.head){p.head.rotation.set(.018+Math.sin(t*.65+phase)*.018,Math.sin(t*.43+phase)*.06,0);}p.arms.forEach((a,i)=>{a.arm.rotation.x=.04+Math.sin(t*.8+phase+i)*.018;a.elbow.rotation.x=.1});}
-function naturalWalk(p,path,u,loaded=false){const a=atPath(path,u),stride=u*pathLength(path)*7.2;const ahead=atPath(path,clamp(u+.025,0,1)),behind=atPath(path,clamp(u-.025,0,1));const heading=Math.atan2(behind.x-ahead.x,behind.z-ahead.z);pPosition(p,a.x,a.z,heading);const weight=Math.sin(stride);p.body.position.y=.84+Math.abs(weight)*.018;p.body.rotation.z=Math.sin(stride*.5)*.018;p.body.rotation.y=loaded?0:Math.sin(stride)*.025;
+function naturalWalk(p,path,u,loaded=false){if(mode==='auto'&&MTM_SHEETS[sheetIndex]?.exact){path=planWalkingPath(path);tracePath(path);}const a=atPath(path,u),stride=u*pathLength(path)*7.2;const ahead=atPath(path,clamp(u+.025,0,1)),behind=atPath(path,clamp(u-.025,0,1));const heading=Math.atan2(behind.x-ahead.x,behind.z-ahead.z);pPosition(p,a.x,a.z,heading);const weight=Math.sin(stride);p.body.position.y=.84+Math.abs(weight)*.018;p.body.rotation.z=Math.sin(stride*.5)*.018;p.body.rotation.y=loaded?0:Math.sin(stride)*.025;
  p.legs.forEach((l,i)=>{const q=stride+i*Math.PI;l.hip.rotation.x=Math.sin(q)*.35;l.knee.rotation.x=Math.max(0,-Math.sin(q))*.53;if(l.ankle)l.ankle.rotation.x=-Math.sin(q)*.13;});
  if(!loaded)p.arms.forEach((a,i)=>{a.arm.rotation.x=-Math.sin(stride+i*Math.PI)*.28;a.elbow.rotation.x=.13+Math.max(0,Math.sin(stride+i*Math.PI))*.12});if(p.head)p.head.rotation.set(.015,0,-p.body.rotation.z*.7);return a;
 }
@@ -58022,7 +58022,42 @@ function hydraulicJack(parent,x=0,z=0){
  cyl(root,.075,.095,.34,'darksteel',0,.23,.30,24);cyl(root,.036,.045,.22,'steel',0,.43,.30,20);box(root,.27,.10,.25,'red',0,.20,.32,.025);
  const steer=group(root,0,.12,.32);for(const side of [-1,1]){const tire=cyl(steer,.12,.12,.075,'tire',side*.085,0,0,24);tire.rotation.z=Math.PI/2;wheels.push(tire);const hub=cyl(steer,.054,.054,.08,'steel',side*.085,0,0,16);hub.rotation.z=Math.PI/2;}
  const handle=group(root,0,.31,.30);beam(handle,[0,0,0],[0,.84,.23],.055,'darksteel');tube(handle,[[-.23,.81,.23],[-.25,1.02,.28],[.25,1.02,.28],[.23,.81,.23],[-.23,.81,.23]],.025,'black');box(handle,.035,.11,.025,'red',.17,.89,.27,.005);
- return{root,handle,forks,wheels,steer};
+ return{root,handle,forks,wheels,steer,operatorDistance:1.25,grips:[vec(-.17,1.037,.284),vec(.17,1.037,.284)]};
+}
+
+// Contacts are evaluated in the jack parent's coordinates before the scene mirror.
+function hydraulicGripPoints(j){
+ j.handle.updateMatrix();j.root.updateMatrix();
+ return j.grips.map(point=>point.clone().applyMatrix4(j.handle.matrix).applyMatrix4(j.root.matrix));
+}
+function hydraulicOperatorPoint(j){
+ return vec(0,0,j.operatorDistance).applyAxisAngle(up,j.root.rotation.y).add(j.root.position);
+}
+function holdHydraulicHandle(p,j){
+ const angle=j.root.rotation.y,stand=hydraulicOperatorPoint(j);
+ pPosition(p,stand.x,stand.z,angle);
+ // The torso remains behind the entire handle sweep, including the pump stroke.
+ p.body.rotation.x=-.08+.05*clamp((j.handle.rotation.x-.12)/.33,0,1);
+ p.root.updateMatrixWorld(true);
+ const back=vec(Math.sin(angle),0,Math.cos(angle));
+ const contacts=hydraulicGripPoints(j);
+ for(let i=0;i<2;i++){
+  const arm=p.arms[i],side=i?1:-1,target=contacts[i].clone().add(vec(0,.075,0)).addScaledVector(back,.018);
+  const local=p.body.worldToLocal(target.clone()),shoulder=arm.arm.position.clone(),delta=local.clone().sub(shoulder);
+  const upper=.285,lower=.238,length=clamp(delta.length(),.06,upper+lower-.001),direction=delta.normalize();
+  const bend=vec(side*.65,-1,.10);bend.addScaledVector(direction,-bend.dot(direction)).normalize();
+  const along=(upper*upper-lower*lower+length*length)/(2*length),height=Math.sqrt(Math.max(0,upper*upper-along*along));
+  const elbow=shoulder.clone().addScaledVector(direction,along).addScaledVector(bend,height);
+  const reachable=shoulder.clone().addScaledVector(direction,length);
+  arm.arm.quaternion.setFromUnitVectors(vec(0,-1,0),elbow.clone().sub(shoulder).normalize());
+  const forearm=reachable.sub(elbow).normalize().applyQuaternion(arm.arm.quaternion.clone().invert());
+  arm.elbow.quaternion.setFromUnitVectors(vec(0,-1,0),forearm);
+  p.root.updateMatrixWorld(true);
+  // Keep the gloves upright around the crossbar as the forearms bend.
+  const parentRotation=arm.elbow.getWorldQuaternion(new THREE.Quaternion());
+  arm.hand.quaternion.copy(parentRotation.invert().multiply(p.root.getWorldQuaternion(new THREE.Quaternion())));
+ }
+ if(p.head)p.head.rotation.x=.12;
 }
 
 function buildTug(color,id){const root=group(scene),shell=group(root);box(shell,1.14,.24,2.12,'black',0,.29,0,.10);box(shell,.94,.07,1.7,'darksteel',0,.43,0,.02);
@@ -58101,12 +58136,12 @@ const storagePath=[[16.8,2.65],[16.8,16.39],[18.25,16.39]],strapPath=[[16.8,2.65
 let activePath=storagePath,lastPathKey='';
 function tracePath(points){const key=JSON.stringify(points);if(key===lastPathKey)return;lastPathKey=key;for(const c of walkTrace.children){c.geometry.dispose();c.material.dispose()}walkTrace.clear();const g=new THREE.BufferGeometry().setFromPoints(points.map(([x,z])=>vec(x,.045,z)));const l=new THREE.Line(g,new THREE.LineDashedMaterial({color:'#d7ef87',dashSize:.16,gapSize:.09}));l.computeLineDistances();walkTrace.add(l);activePath=points}
 function pPosition(p,x,z,angle=0){p.root.position.set(x,0,z);p.root.rotation.y=angle}
-function resetPerson(p){if(p.head)p.head.rotation.set(0,0,0);for(const l of p.legs)if(l.ankle)l.ankle.rotation.set(0,0,0);p.root.position.y=0;p.body.position.set(0,.84,0);p.body.rotation.set(0,0,0);p.held.position.set(0,.12,-.43);p.held.rotation.set(0,0,0);for(const ob of Object.values(p.payloads))ob.visible=false;p.arms.forEach((a,i)=>{a.arm.rotation.set(.04,0,(i?1:-1)*.04);a.elbow.rotation.x=-.08});p.legs.forEach(l=>{l.hip.rotation.x=0;l.knee.rotation.x=0});pPosition(p,p.home.x,p.home.z);}
+function resetPerson(p){if(p.head)p.head.rotation.set(0,0,0);for(const l of p.legs)if(l.ankle)l.ankle.rotation.set(0,0,0);p.root.position.y=0;p.body.position.set(0,.84,0);p.body.rotation.set(0,0,0);p.held.position.set(0,.12,-.43);p.held.rotation.set(0,0,0);for(const ob of Object.values(p.payloads))ob.visible=false;p.arms.forEach((a,i)=>{a.arm.rotation.set(.04,0,(i?1:-1)*.04);a.elbow.rotation.x=-.08;a.hand.rotation.set(0,0,0);});p.legs.forEach(l=>{l.hip.rotation.x=0;l.knee.rotation.x=0});pPosition(p,p.home.x,p.home.z);}
 function hold(p,kind,height=.12){p.payloads[kind].visible=true;p.held.position.y=height;p.arms.forEach((a,i)=>{a.arm.rotation.x=-.82;a.arm.rotation.z=(i?1:-1)*.13;a.elbow.rotation.x=-.62})}
 function reach(p,u,{bend=0,turn=0,kind=null}={}){const k=Math.sin(Math.PI*u);p.body.rotation.x=-bend*k;p.body.position.y=.84-bend*.2*k;p.body.rotation.y=turn*k;p.arms.forEach((a,i)=>{a.arm.rotation.x=-.35-k*.8;a.elbow.rotation.x=-.3-k*.5;a.arm.rotation.z=(i?1:-1)*.12});if(kind)hold(p,kind,.12+k*.16)}
 function walk(p,path,u,carrying=false){const a=atPath(path,u);pPosition(p,a.x,a.z,a.angle);const stride=u*pathLength(path)*7;p.legs.forEach((l,i)=>{l.hip.rotation.x=Math.sin(stride+i*Math.PI)*.38;l.knee.rotation.x=Math.max(0,Math.sin(stride+i*Math.PI))*.43});if(carrying)hold(p,carrying);else p.arms.forEach((a,i)=>a.arm.rotation.x=Math.sin(stride+i*Math.PI)*.25);return a}
 for(const p of workers){p.payloads.routePlastic=group(p.held);p.payloads.routePaper=group(p.held);for(let j=0;j<11;j++){const q=crate(p.payloads.routePlastic,0,j*.065,0,'blue2',0,.72);q.scale.y=.20;cardboard(p.payloads.routePaper,0,j*.065,0,0,.5,.055,.36)}p.payloads.routePlastic.visible=p.payloads.routePaper.visible=false;}
-function updateWorkers(dt){restoreVideoMirror();exactRoot.visible=mode==='auto'&&!!MTM_SHEETS[sheetIndex].exact;videoLayout.visible=exactRoot.visible;warehouseRoof.visible=exactRoot.visible&&roofOn&&cameraMode!=='top';staticRoot.visible=!exactRoot.visible;roofRoot.visible=!exactRoot.visible&&roofOn&&cameraMode!=='top';decorativeBenchCargo.visible=!exactRoot.visible;for(const f of fans)f.visible=!exactRoot.visible;if(exactRoot.visible){updateExact();applyVideoMirror();return}if(mode==='manual'){workers.forEach(resetPerson);seatOperator(workers[2],vehicles[selected]);return}
+function updateWorkers(dt){restoreVideoMirror();exactRoot.visible=mode==='auto'&&!!MTM_SHEETS[sheetIndex].exact;videoLayout.visible=exactRoot.visible;walkTrace.scale.x=exactRoot.visible?-1:1;warehouseRoof.visible=exactRoot.visible&&roofOn&&cameraMode!=='top';staticRoot.visible=!exactRoot.visible;roofRoot.visible=!exactRoot.visible&&roofOn&&cameraMode!=='top';decorativeBenchCargo.visible=!exactRoot.visible;for(const f of fans)f.visible=!exactRoot.visible;if(exactRoot.visible){updateExact();applyVideoMirror();return}if(mode==='manual'){workers.forEach(resetPerson);seatOperator(workers[2],vehicles[selected]);return}
 
  if(MTM_SHEETS[sheetIndex].sourceType==='observed'){updateObserved();return}obsBin.visible=false;smallBin.visible=true;workers.forEach(resetPerson);const p=workers[actorIndex],{sheet,op,fraction:u,local}=leafState(),n=op.n,d=op.description.toLowerCase(),w=Math.sin(Math.PI*u);
  storageDisplay.visible=sheetIndex===4;paperBox.visible=sheetIndex===5;strapLoad.visible=sheetIndex===6;transLoad.visible=sheetIndex===7;jack.root.visible=sheetIndex>=7;handledPallet.visible=sheetIndex===8;mtmProps.visible=true;
@@ -58429,7 +58464,7 @@ for(const z of [-.21,.21]){
  for(const x of [-.43,.43]){cyl(openingFixture,.014,.014,.008,'steel',x,1.008,z,10);}
 }
 label(openingFixture,'ABERTURA DE EMBALAGENS',1.03,.11,0,.76,-.38,{size:24,rotation:Math.PI});
-const openingSurface=vec(5.6,1.005,4.55),openingOperator=[4.95,4.55];
+const openingSurface=vec(5.28,1.005,4.55),openingOperator=[4.62,4.55];
 
 // Long plastic reception bench and the return bench for cardboard.
 videoBench(-4.3,2.45,5);videoBench(3.1,3.68,3,-Math.PI/2);
@@ -58497,6 +58532,64 @@ function buildExactInventory(sh){
  const pla=exactUnits.filter(u=>u.type<4).length;
  $('inventorySummary').textContent=`${sh.name}: ${exactUnits.length} embalagens (${pla} plásticas + ${exactUnits.length-pla} papelão).`;
 }
+// Pedestrian clearance and cached visibility graphs, in the operation's local coordinates.
+const WALK_CLEARANCE=.38,walkingGraphs=new Map(),walkingPaths=new Map(),walkingRouteFailures=[];
+function walkingObstacles(placed=false){
+ const items=[],add=(name,x,z,w,d)=>items.push({name,x1:x-w/2,x2:x+w/2,z1:z-d/2,z2:z+d/2});
+ add('bancada_plastico',-1.84,2.45,6.14,1.02);add('bancada_papelao',3.1,4.91,1.02,3.68);
+ add('recipiente_plastico',-5.7,2.55,1.26,1.05);add('recipiente_papelao',4.1,6.5,1.26,1.05);
+ for(const x of [-5.4,-4.1,-2.8,-1.5,-.2,1.1])add('pallet_posicao',x,5.65,1.2,1);
+ for(const x of [-9.4,-4.9,.2,5.3,10.4])for(const z of [10.6,13.7,16.8,20,23.2])add('pallet_estoque',x,z,1.26,1.06);
+ add('dispositivo_abertura',5.6,4.55,1.14,.74);add('sala',12.4,5.8,2.8,3.4);
+ for(const x of [7.25,8])add('tambor',x,6.8,.64,.64);
+ for(const z of [10.8,15.6,20.4])add('suporte_pallets',12.5,z,1.28,1.3);
+ add('bobina_fita',-7,5.7,.6,.6);
+ add('pallet_referencia',placed?-5.6:-7.2,placed?7:12,1.25,1.02);
+ add('paleteira_estacionada',placed?-8.1:-7.2,(placed?8.3:14)-.325,.8,1.55);
+ // Walking access is alongside the trains; getting into/out of the seat is handled separately.
+ for(const v of vehicles.slice(0,2)){add('rebocador',v.x,v.z,2.1,1.15);for(const t of v.trailers)add('carretinha',t.x,t.z,1.91,1.22);}
+ add('empilhadeira',11.8,-4.5,1.4,2.4);
+ return items;
+}
+const walkingInside=(p,r)=>p[0]>r.x1+1e-7&&p[0]<r.x2-1e-7&&p[1]>r.z1+1e-7&&p[1]<r.z2-1e-7;
+function walkingLineClear(a,b,rects){
+ for(const r of rects){
+  let enter=0,leave=1;const min=[r.x1+1e-6,r.z1+1e-6],max=[r.x2-1e-6,r.z2-1e-6];let outside=false;
+  for(let axis=0;axis<2;axis++){const delta=b[axis]-a[axis];if(Math.abs(delta)<1e-9){if(a[axis]<=min[axis]||a[axis]>=max[axis]){outside=true;break;}}else{let t1=(min[axis]-a[axis])/delta,t2=(max[axis]-a[axis])/delta;if(t1>t2)[t1,t2]=[t2,t1];enter=Math.max(enter,t1);leave=Math.min(leave,t2);if(enter>=leave){outside=true;break;}}}
+  if(!outside&&enter<leave&&leave>0&&enter<1)return false;
+ }
+ return true;
+}
+function walkingGraph(placed){
+ const key=(placed?'placed':'parked')+':'+MTM_SHEETS[sheetIndex].vehicle;if(walkingGraphs.has(key))return walkingGraphs.get(key);
+ const rects=walkingObstacles(placed).map(r=>({...r,x1:r.x1-WALK_CLEARANCE,x2:r.x2+WALK_CLEARANCE,z1:r.z1-WALK_CLEARANCE,z2:r.z2+WALK_CLEARANCE}));
+ const nodes=[],free=p=>!rects.some(r=>walkingInside(p,r))&&p[0]>-13.3&&p[0]<13.3&&p[1]>-7&&p[1]<25.7;
+ for(const r of rects)for(const x of [r.x1-.025,r.x2+.025])for(const z of [r.z1-.025,r.z2+.025])if(free([x,z]))nodes.push([x,z]);
+ const edges=nodes.map(()=>[]);for(let i=0;i<nodes.length;i++)for(let j=0;j<i;j++)if(walkingLineClear(nodes[i],nodes[j],rects)){const d=Math.hypot(nodes[i][0]-nodes[j][0],nodes[i][1]-nodes[j][1]);edges[i].push([j,d]);edges[j].push([i,d]);}
+ const graph={key,rects,nodes,edges,free};walkingGraphs.set(key,graph);return graph;
+}
+function walkingLeg(a,b,g){
+ if(walkingLineClear(a,b,g.rects))return [a,b];
+ const n=g.nodes.length,nodes=[...g.nodes,a,b],start=n,end=n+1,edges=[...g.edges.map(e=>e.slice()),[],[]];
+ for(let i=0;i<n;i++)for(const id of [start,end])if(walkingLineClear(nodes[i],nodes[id],g.rects)){const d=Math.hypot(nodes[i][0]-nodes[id][0],nodes[i][1]-nodes[id][1]);edges[i].push([id,d]);edges[id].push([i,d]);}
+ const dist=Array(n+2).fill(Infinity),prev=Array(n+2).fill(-1),used=new Set();dist[start]=0;
+ for(let step=0;step<n+2;step++){let u=-1;for(let i=0;i<n+2;i++)if(!used.has(i)&&(u<0||dist[i]<dist[u]))u=i;if(u<0||!Number.isFinite(dist[u]))break;if(u===end)break;used.add(u);for(const [v,d]of edges[u])if(dist[u]+d<dist[v]){dist[v]=dist[u]+d;prev[v]=u;}}
+ if(!Number.isFinite(dist[end]))return null;
+ const path=[];for(let u=end;u!==-1;u=prev[u])path.unshift(nodes[u]);return path;
+}
+function planWalkingPath(points){
+ const sh=MTM_SHEETS[sheetIndex];if(mode!=='auto'||!sh?.exact)return points;
+ const g=walkingGraph(time>=sh.strapStart),key=g.key+JSON.stringify(points);if(walkingPaths.has(key))return walkingPaths.get(key);
+ const requested=points.filter((p,i)=>i===0||i===points.length-1||g.free(p));let path=[requested[0]];
+ for(let i=1;i<requested.length;i++){
+  const leg=walkingLeg(path[path.length-1],requested[i],g);
+  if(!leg){walkingRouteFailures.push({key,start:path[path.length-1],end:requested[i]});return [points[0],points[0]];}
+  path.push(...leg.slice(1));
+ }
+ path=path.filter((p,i)=>i===0||Math.hypot(p[0]-path[i-1][0],p[1]-path[i-1][1])>1e-6);
+ if(path.length<2)path.push(path[0]);walkingPaths.set(key,path);return path;
+}
+
 const easeMotion=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
 function exactTrip(){const {sheet:sh,op,fraction:u}=leafState();const ti=Math.min(op.trips.length-1,Math.floor(u*op.trips.length)),phase=Math.min(1,u*op.trips.length-ti);return{sh,op,ti,phase,ids:op.trips[ti]};}
 function exactSnapshot(){
@@ -58520,11 +58613,11 @@ function exactMotionGeometry(sh,ids,v,kind='inventory'){
  if(isUnload){start=[origin.x,.99];end=unit.type<4?[target.x,1.50]:[2.10,target.z];path=unit.type<4?[start,[end[0],.99],end]:[start,[2.10,.99],end];startAngle=0;endAngle=unit.type<4?Math.PI:-Math.PI/2;}
  else if(kind==='storage'){start=[origin.x,3.35];end=[target.x,4.65];path=[start,[start[0],4.1],[end[0],4.1],end];startAngle=0;endAngle=Math.PI;}
  else {start=[4.08,origin.z];end=[4.1,5.55];path=[start,[4.8,origin.z],[4.8,5.55],end];startAngle=Math.PI/2;endAngle=Math.PI;}
- return{origin,target,start,end,path,startAngle,endAngle,isUnload};
+ path=planWalkingPath(path);return{origin,target,start,end,path,startAngle,endAngle,isUnload};
 }
 function updateExact(){
  const sh=MTM_SHEETS[sheetIndex];if(exactSheet!==sh)buildExactInventory(sh);
- workers.forEach(resetPerson);const idlePositions=[[-1.2,3.7],[3.8,5.4],[5.8,1.1]];workers.forEach((person,i)=>{pPosition(person,...idlePositions[i],Math.PI);breathePerson(person,time,i*1.8)});
+ workers.forEach(resetPerson);const idlePositions=[[-1.2,3.7],[4.2,5.4],[5.8,1.1]];workers.forEach((person,i)=>{pPosition(person,...idlePositions[i],Math.PI);breathePerson(person,time,i*1.8)});
  mtmProps.visible=false;selected=sh.vehicle;actorIndex=2;const v=vehicles[selected],other=vehicles[1-selected];
  Object.assign(v,{x:5.65,z:0,angle:-Math.PI/2});straightTrailers(v);Object.assign(other,{x:10.8,z:-3.8,angle:-Math.PI/2});straightTrailers(other);other.root.visible=true;other.trailers.forEach(t=>t.root.visible=true);v.root.visible=true;v.trailers.forEach(t=>t.root.visible=true);
  Object.assign(forklift,{x:11.8,z:-4.5,angle:Math.PI});sync(forklift);forklift.root.visible=true;
@@ -58544,7 +58637,7 @@ function updateExact(){
  if(u<walkStart){pPosition(p,...motion.start,motion.startAngle);const bend=Math.sin(Math.PI*clamp(u/walkStart,0,1))*.22;p.body.rotation.x=bend;p.body.position.y=.84-bend*.13;p.legs.forEach(l=>{l.hip.rotation.x=-bend*.35;l.knee.rotation.x=bend*.7;});if(p.head)p.head.rotation.x=.18;}
  else if(u<walkEnd){const q=easeMotion((u-walkStart)/(walkEnd-walkStart));naturalWalk(p,motion.path,q,true);const inTurn=easeMotion((u-walkStart)/.06),outTurn=easeMotion((u-(walkEnd-.06))/.06);let angle=p.root.rotation.y;angle=motion.startAngle+angleDiff(angle,motion.startAngle)*inTurn;angle+=angleDiff(motion.endAngle,angle)*outTurn;p.root.rotation.y=angle;}
  else if(u<.84){pPosition(p,...motion.end,motion.endAngle);p.body.rotation.x=Math.sin(Math.PI*(u-.61)/.23)*.14;if(p.head)p.head.rotation.x=.12;}
- else{let nextIds=op.trips[ti+1]||(sh.ops[op.n]?.ids.length?sh.ops[op.n].trips[0]:null)||ids;const nextKind=op.trips[ti+1]?op.kind:sh.ops[op.n]?.ids.length?sh.ops[op.n].kind:op.kind;const next=exactMotionGeometry(sh,nextIds,v,nextKind),returnPath=motion.isUnload?[motion.end,[motion.end[0],.99],next.start]:[motion.end,[motion.end[0],4.1],[next.start[0],4.1],next.start];naturalWalk(p,returnPath,easeMotion((u-.84)/.16));}
+ else{const nextTrip=op.trips[ti+1],nextOp=sh.ops[op.n],sameActor=nextOp?.kind===op.kind;const nextIds=nextTrip||(sameActor?nextOp.trips[0]:null);const nextStart=nextIds?exactMotionGeometry(sh,nextIds,v,op.kind).start:op.kind==='inventory'?[5.8,1.1]:[-1.2,3.7];const returnPath=motion.isUnload?[motion.end,[motion.end[0],.99],nextStart]:[motion.end,[motion.end[0],4.1],[nextStart[0],4.1],nextStart];naturalWalk(p,returnPath,easeMotion((u-.84)/.16));}
  scene.updateMatrixWorld(true);const snapshot=exactSnapshot();let handTarget=null;
  sh.units.forEach((unit,i)=>{const ob=exactMeshes[i],state=snapshot.states[i];ob.visible=true;ob.rotation.set(0,0,0);const origin=motion.isUnload?itemOnTrailer(unit,v):unit.source.clone(),destination=motion.isUnload?unit.source:unit.storage;let pos;ob.scale.y=ob.userData.fullScaleY;
  if(state==='bancada')pos=unit.source.clone();else if(state==='carreta')pos=itemOnTrailer(unit,v);else if(state==='armazenada'||state==='descartada'){pos=unit.storage.clone();}
@@ -58609,12 +58702,12 @@ const spool=group(videoLayout,-7.0,0,5.7);const spoolRing=cyl(spool,.27,.27,.12,
 label(videoLayout,'ARQUEAMENTO · REFERÊNCIA DO VÍDEO',2.5,.16,-5.6,.17,6.48,{size:27,rotation:Math.PI});
 strapStation.visible=spool.visible=true;strapTool.visible=looseStrap.visible=false;
 function updateStrapping(sh,op,u){const p=workers[2],n=op.strapPhase;strapStation.visible=spool.visible=true;strapTool.visible=n>=3;looseStrap.visible=n<4;processStraps.forEach((g,i)=>g.visible=n>i*2+1||(n===i*2+1&&u>.6));
- const center=strapStation.position;
- if(n===0){naturalWalk(p,[[-7,4.9],[-5.6,5.9]],easeMotion(u));}
- else if(n===1||n===3){const points=n===1?[[-5.6,5.9],[-4.65,5.9],[-4.65,7],[-5.6,7.65]]:[[-5.6,7.65],[-6.6,7.65],[-6.6,6],[-5.6,5.9]];naturalWalk(p,points,easeMotion(u),true);p.body.rotation.x=.08;}
- else{pPosition(p,-5.6,5.92,Math.PI);const crouch=n===2?Math.sin(Math.PI*u)*.40:Math.sin(Math.PI*u)*.10;p.body.position.y=.84-crouch*.5;p.body.rotation.x=crouch;p.legs.forEach(l=>{l.hip.rotation.x=-crouch*.5;l.knee.rotation.x=crouch});if(p.head)p.head.rotation.x=.22;}
- const hand=vec(n<3?-.36:.36,1.16,.0).add(center);if(n===2)hand.y=lerp(.22,1.16,easeMotion(u));
- if(n===1||n===3){hand.copy(p.root.position).add(vec(0,1.04,-.4).applyAxisAngle(up,p.root.rotation.y));}
+ const center=strapStation.position,left=[-6.65,7],right=[-4.55,7];
+ if(n===0){const stand=hydraulicOperatorPoint(processJack);naturalWalk(p,[[stand.x,stand.z],[-7.85,5.7],left],easeMotion(u));}
+ else if(n===1||n===3){const points=n===1?[left,[-6.65,8.05],[-4.55,8.05],right]:[right,[-4.55,8.05],[-6.65,8.05],left];naturalWalk(p,points,easeMotion(u),true);p.body.rotation.x=.08;}
+ else{const position=n===2?right:left;pPosition(p,...position,n===2?Math.PI/2:-Math.PI/2);const crouch=n===2?Math.sin(Math.PI*u)*.40:Math.sin(Math.PI*u)*.10;const bend=crouch*1.25;p.body.position.y=.12+.02*Math.cos(crouch)+.7*Math.cos(bend);p.body.rotation.x=crouch;p.legs.forEach(l=>{l.hip.rotation.x=-bend-crouch;l.knee.rotation.x=2*bend;if(l.ankle)l.ankle.rotation.x=-bend;});if(p.head)p.head.rotation.x=.22;}
+ const hand=vec(n===2?.58:-.58,1.16,0).add(center);if(n===2)hand.y=lerp(.22,1.16,easeMotion(u));
+ if(n===0||n===1||n===3)hand.copy(p.root.position).add(vec(0,1.04,-.4).applyAxisAngle(up,p.root.rotation.y));
  aimHands(p,hand,.22);strapTool.position.copy(hand);strapTool.position.y+=.035;strapTool.rotation.set(0,p.root.rotation.y,0);looseStrap.position.copy(hand);looseStrap.rotation.y=p.root.rotation.y;looseStrap.scale.z=1-u*.6;
 }
 function makePaperBox(parent,w,h,d){const g=group(parent);box(g,w,.012,d,'cardboard',0,.006,0,.001);const hinges=[];
@@ -58638,11 +58731,11 @@ function applyVideoMirror(){for(const root of mirroredActors()){root.position.x=
 videoLayout.traverse(o=>{if(o.isMesh&&o.geometry.type==='PlaneGeometry'&&o.material.map){const g=o.geometry.clone(),uv=g.attributes.uv;for(let i=0;i<uv.count;i++)uv.setX(i,1-uv.getX(i));uv.needsUpdate=true;o.geometry=g;}});
 
 function driverTransition(p,v,u,mount,sh){
- const seat=vec(0,0,.44).applyAxisAngle(up,v.angle).add(vec(v.x,0,v.z));const side=vec(.85,0,.44).applyAxisAngle(up,v.angle).add(vec(v.x,0,v.z));
+ const seat=vec(0,0,.44).applyAxisAngle(up,v.angle).add(vec(v.x,0,v.z));const side=vec(1.02,0,.44).applyAxisAngle(up,v.angle).add(vec(v.x,0,v.z));
  const first=sh.ops.find(o=>o.kind==='inventory');const target=exactMotionGeometry(sh,first.trips[0],v).start;
  const q=mount?1-u:u;
  if(q<.4){const f=easeMotion(q/.4);seatOperator(p,v);p.root.position.copy(seat.clone().lerp(side,f));p.body.position.y=lerp(1.035,.84,f);p.legs.forEach((l,i)=>{l.hip.rotation.x=1.2*(1-f);l.knee.rotation.x=-1.2*(1-f)+Math.sin(f*Math.PI)*(i?.15:.28)});p.arms.forEach(a=>{a.arm.rotation.x=lerp(1,.04,f);a.elbow.rotation.x=lerp(.45,.1,f)});}
- else{const end=mount?[-5.6,5.92]:target;const path=mount?[[side.x,side.z],[-7.1,.99],[-7.1,5.92],end]:[[side.x,side.z],target];naturalWalk(p,path,easeMotion((q-.4)/.6));}
+ else{const end=mount?[-6.65,7]:target;const path=mount?[[side.x,side.z],[-7.1,.99],[-7.1,4.2],end]:[[side.x,side.z],target];naturalWalk(p,path,easeMotion((q-.4)/.6));}
 }
 function focusWarehouse(cutaway=false){setCamera('orbit');camera.position.set(cutaway?1:-10,cutaway?23:4.6,cutaway?-23:-5.5);controls.target.set(0,cutaway?1.2:2.5,10.5);camera.lookAt(controls.target);controls.update();if(cutaway){roofOn=false;$('roofBtn').classList.remove('active');warehouseRoof.visible=false;showToast('Visão da operação. Ative Cobertura para ver o prédio e a marquise.');}}
 $('warehouseOverview').onclick=()=>focusWarehouse(true);
@@ -58666,25 +58759,25 @@ $('separationDoorView').onclick=focusSeparationDoor;
 const warehouseAmbient=new THREE.HemisphereLight('#eef0e7','#827562',.45);videoLayout.add(warehouseAmbient);for(const x of [-7,7])for(const z of [2,12,22]){const light=new THREE.PointLight('#fff4da',65,24,2);light.position.set(x,6.6,z);videoLayout.add(light);}
 
 const processJack=hydraulicJack(videoLayout,-7.2,14.0);
-const palletTransportPath=[[-7.2,12],[-7.2,8.5],[-5.6,8.5],[-5.6,7]];
+const palletTransportPath=[[-7.2,12],[-7.2,8.1],[-5.6,8.1],[-5.6,7]];
 function palletContext(sh,op){
  const started=time>=sh.jackStart,finished=time>=sh.strapStart;
  strapStation.visible=spool.visible=true;processJack.root.visible=true;
  strapStation.position.set(finished?-5.6:-7.2,0,finished?7:12);strapStation.rotation.y=0;
- processJack.root.position.set(finished?-7.1:-7.2,0,finished?8.6:14.0);processJack.root.rotation.y=0;processJack.forks.position.y=0;processJack.handle.rotation.x=.12;
+ processJack.root.position.set(finished?-8.1:-7.2,0,finished?8.3:14.0);processJack.root.rotation.y=0;processJack.forks.position.y=0;processJack.handle.rotation.x=.12;
  processStraps.forEach(g=>g.visible=op.kind==='driveOut'||op.kind==='mount');
 }
 function updatePalletTransport(sh,op,u){
  const p=workers[2],n=op.jackPhase;let load=vec(-7.2,0,12),angle=0,jackPos=vec(-7.2,0,14),lift=0;
- if(n===0){naturalWalk(p,[[5.8,1.1],[-7.2,1.1],[-7.2,14.9]],easeMotion(u));}
+ if(n===0){const stand=hydraulicOperatorPoint(processJack);naturalWalk(p,[[5.8,1.1],[-7.2,1.1],[stand.x,stand.z]],easeMotion(u));}
  if(n===1){jackPos.z=lerp(14,12.65,easeMotion(u));pPosition(p,jackPos.x,jackPos.z+.9,0);p.body.rotation.x=.07;const stride=u*12;p.legs.forEach((l,i)=>{l.hip.rotation.x=Math.sin(stride+i*Math.PI)*.24;l.knee.rotation.x=Math.max(0,-Math.sin(stride+i*Math.PI))*.35;});}
  if(n===2){jackPos.z=12.65;lift=.09*easeMotion(u);pPosition(p,-7.2,13.55,0);p.body.rotation.x=.08+Math.sin(u*TAU*3)*.035;processJack.handle.rotation.x=.12+Math.max(0,Math.sin(u*TAU*3))*.33;}
  if(n===3){const f=easeMotion(u),at=atPath(palletTransportPath,f),before=atPath(palletTransportPath,Math.max(0,f-.035)),after=atPath(palletTransportPath,Math.min(1,f+.035));angle=Math.atan2(before.x-after.x,before.z-after.z);load.set(at.x,.09,at.z);lift=.09;jackPos.copy(load).add(vec(Math.sin(angle)*.65,-.09,Math.cos(angle)*.65));pPosition(p,jackPos.x+Math.sin(angle)*.9,jackPos.z+Math.cos(angle)*.9,angle);const stride=f*pathLength(palletTransportPath)*7;p.legs.forEach((l,i)=>{l.hip.rotation.x=Math.sin(stride+i*Math.PI)*.32;l.knee.rotation.x=Math.max(0,-Math.sin(stride+i*Math.PI))*.46;});p.body.rotation.x=.07;p.body.position.y=.84+Math.abs(Math.sin(stride))*.012;}
  if(n===4){load.set(-5.6,.09*(1-easeMotion(u)),7);jackPos.set(-5.6,0,7.65);lift=load.y;pPosition(p,-5.6,8.55,0);processJack.handle.rotation.x=.2;}
- if(n===5){load.set(-5.6,0,7);const path=[[-5.6,7.65],[-5.6,8.6],[-7.1,8.6]],at=atPath(path,easeMotion(u));jackPos.set(at.x,0,at.z);angle=0;pPosition(p,at.x,at.z+.9,0);const stride=u*15;p.legs.forEach((l,i)=>l.hip.rotation.x=Math.sin(stride+i*Math.PI)*.22);}
+ if(n===5){load.set(-5.6,0,7);const path=[[-5.6,7.65],[-5.6,8.3],[-8.1,8.3]],at=atPath(path,easeMotion(u));jackPos.set(at.x,0,at.z);angle=0;pPosition(p,at.x,at.z+.9,0);const stride=u*15;p.legs.forEach((l,i)=>l.hip.rotation.x=Math.sin(stride+i*Math.PI)*.22);}
  if(n!==3)load.y=lift;
  strapStation.position.copy(load);strapStation.rotation.y=n===3?angle:0;processJack.root.position.copy(jackPos);processJack.root.rotation.y=angle;processJack.forks.position.y=lift;
- if(n>0){const grip=vec(0,1.26,.57).applyAxisAngle(up,angle).add(jackPos);aimHands(p,grip,.43);if(p.head)p.head.rotation.x=.12;}
+ if(n>0)holdHydraulicHandle(p,processJack);
  processJack.wheels.forEach(w=>w.rotation.x=-u*(n===3?18:n===1?8:2));
  tracePath(palletTransportPath);
 }
@@ -58693,9 +58786,9 @@ function focusPalletContext(){setCamera('orbit');camera.position.set(8,5.8,18.5)
 
 function updatePaperOpening(sh,op,u,ids,v){
  const p=workers[1],unit=sh.units[ids[0]],start=[4.08,unit.source.z],end=[4.1,5.55];
- const toFixture=[start,[4.80,start[1]],[4.80,4.55],openingOperator];
- const toBin=[openingOperator,[4.80,5.55],end];
- const walk=(path,t,a,b)=>{const q=easeMotion(t);naturalWalk(p,path,q,true);
+ const toFixture=planWalkingPath([start,[4.62,start[1]],[4.62,4.55],openingOperator]);
+ const toBin=planWalkingPath([openingOperator,[4.62,5.55],end]);
+ const walk=(path,t,a,b)=>{path=planWalkingPath(path);const q=easeMotion(t);naturalWalk(p,path,q,true);
   const segments=[];let distance=0,previous=a;for(let k=1;k<path.length;k++){const dx=path[k][0]-path[k-1][0],dz=path[k][1]-path[k-1][1],length=Math.hypot(dx,dz);if(length<1e-6)continue;const angle=previous+angleDiff(Math.atan2(-dx,-dz),previous);segments.push({start:distance,length,angle});distance+=length;previous=angle;}
   let heading=segments[0]?.angle??a;for(let k=1;k<segments.length;k++)heading=lerp(heading,segments[k].angle,easeMotion((q*distance-segments[k].start+.16)/.32));
   heading=lerp(a,heading,easeMotion(t/.16));const finalAngle=previous+angleDiff(b,previous);p.root.rotation.y=lerp(heading,finalAngle,easeMotion((t-.84)/.16));};
@@ -58704,7 +58797,7 @@ function updatePaperOpening(sh,op,u,ids,v){
  else if(u<.62){pPosition(p,...openingOperator,-Math.PI/2);p.body.rotation.x=.08+Math.sin(clamp((u-.44)/.14,0,1)*Math.PI)*.07;if(p.head)p.head.rotation.x=.20;}
  else if(u<.71)walk(toBin,(u-.62)/.09,-Math.PI/2,Math.PI);
  else if(u<.84){pPosition(p,...end,Math.PI);p.body.rotation.x=Math.sin((u-.71)/.13*Math.PI)*.12;}
- else{const nextOp=sh.ops[op.n],next=nextOp?.kind==='paper'?sh.units[nextOp.ids[0]].source:unit.source;walk([end,[4.8,5.55],[4.8,next.z],[4.08,next.z]],(u-.84)/.16,Math.PI,Math.PI/2);}
+ else{const nextOp=sh.ops[op.n],next=nextOp?.kind==='paper'?sh.units[nextOp.ids[0]].source:unit.source;walk([end,[4.62,5.55],[4.62,next.z],[4.08,next.z]],(u-.84)/.16,Math.PI,Math.PI/2);}
  tracePath([...toFixture,...toBin.slice(1)]);scene.updateMatrixWorld(true);
  const sn=exactSnapshot(),carry=vec(0,1.045,-.43).applyAxisAngle(up,p.root.rotation.y).add(p.root.position);
  let handTarget=null;
