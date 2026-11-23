@@ -57892,6 +57892,15 @@ const textMaterials=new Map();function label(p,text,w,h,x,y,z,{bg='#e4e5d6',fg='
 const crateProtos={};function crateProto(color='blue'){if(crateProtos[color])return crateProtos[color];let g=group();box(g,.59,.035,.39,color,0,.02,0,.008);for(const s of [-1,1]){box(g,.59,.265,.023,color,0,.162,s*.19,.008);box(g,.025,.265,.36,color,s*.285,.162,0,.006);box(g,.62,.035,.035,color,0,.302,s*.202,.009);box(g,.035,.035,.39,color,s*.3,.302,0,.009);for(let i=-4;i<=4;i++)box(g,.012,.22,.024,color,i*.059,.16,s*.208,.003);for(let i=-2;i<=2;i++)box(g,.022,.22,.014,color,s*.302,.16,i*.061,.003);box(g,.2,.036,.005,'black',0,.246,s*.221,.009);box(g,.21,.012,.014,color,0,.269,s*.223,.004);for(let x of [-.24,.24])box(g,.07,.04,.06,color,x,.005,s*.145,.005);for(let y of [.08,.19])box(g,.59,.014,.022,color,0,y,s*.221,.004)}
 label(g,'MTM  6420',.17,.055,.16,.125,-.236,{size:28,rotation:Math.PI});label(g,'▥ ▥  014',.15,.047,-.15,.13,.236,{size:28});crateProtos[color]=bake(g);return crateProtos[color]}
 function crate(p,x,y,z,color='blue',rot=0,scale=1){const g=crateProto(color).clone();g.position.set(x,y,z);g.rotation.y=rot;g.scale.setScalar(scale);p.add(g);return g}
+// Pallets de destino das caixas plásticas: apenas um junto à bancada, os demais nas áreas de armazenamento.
+// Os 6 primeiros são fixos (1 junto à bancada + 5 nas raias); os demais são criados só quando a rota precisa.
+const PALLET_SLOTS=[[-5.4,5.65],[-3.45,10.6],[1.65,10.6],[-3.45,13.7],[6.75,10.6],[9.05,10.6],
+ [1.65,13.7],[6.75,13.7],[9.05,13.7],[-3.45,16.8],[1.65,16.8],[6.75,16.8],[9.05,16.8],[-7.95,16.8],
+ [-3.45,20],[1.65,20],[6.75,20],[9.05,20],[-7.95,20],[-3.45,23.2],[1.65,23.2],[6.75,23.2],[9.05,23.2],[-7.95,23.2]];
+const STATIC_PALLETS=6,STACK_LIMIT=3;
+// Posições na bancada: plástico = 5 módulos × 4 bases; papelão = 5 faixas × 2 bases. Pilhas de no máximo STACK_LIMIT.
+const BENCH_CELLS={plastic:Array.from({length:20},(_,i)=>({seg:Math.floor(i/4),x:-4.55+Math.floor(i/4)*1.23+(i%2)*.60,z:2.23+Math.floor(i%4/2)*.42})),
+ paper:Array.from({length:10},(_,i)=>({seg:Math.floor(i/2),x:2.80+(i%2)*.60,z:3.45+Math.floor(i/2)*.46}))};
 let palletProto;function pallet(p,x,y,z,rot=0){if(!palletProto){let g=group();for(let xx of [-.49,0,.49]){box(g,.13,.07,1,'wood',xx,.04,0,.005);for(let zz of [-.4,0,.4])box(g,.13,.09,.14,'wood',xx,.1,zz,.004)}for(let i=0;i<7;i++)box(g,1.2,.026,.119,'wood',0,.164,-.439+i*.146,.003);for(let x of [-.47,0,.47])for(let z of [-.44,.44])cyl(g,.008,.008,.003,'darksteel',x,.179,z,8);palletProto=bake(g)}const g=palletProto.clone();g.position.set(x,y,z);g.rotation.y=rot;p.add(g);return g}
 let frameProto;function metalPallet(p,x,y,z,rot=0){if(!frameProto){let g=group();box(g,1.2,.045,1,'darksteel',0,.18,0,.006);for(let xx of [-.55,.55]){box(g,.055,.16,1,'steel',xx,.09,0,.008);for(let zz of [-.44,.44])box(g,.07,.18,.07,'steel',xx,.08,zz,.005)}for(let zz of [-.46,.46]){box(g,1.2,.045,.045,'steel',0,.12,zz,.005);label(g,'VW AG   BEHÄLTERMANAGEMENT',.98,.05,0,.125,zz*1.1,{size:22,rotation:zz<0?Math.PI:0})}for(let x=-.5;x<=.5;x+=.125)box(g,.015,.023,1,'steel',x,.2,0,.003);frameProto=bake(g)}let g=frameProto.clone();g.position.set(x,y,z);g.rotation.y=rot;p.add(g);return g}
 let binProto;function largeBin(p,x,y,z,color='blue',rot=0){const g=group(p,x,y,z,rot);metalPallet(g,0,0,0);box(g,1.17,.07,.97,color,0,.27,0,.02);for(let s of [-1,1]){box(g,1.2,.82,.035,color,0,.71,s*.48,.015);box(g,.035,.82,.96,color,s*.58,.71,0,.015);for(let xx of [-.54,0,.54])box(g,.025,.83,.027,'darksteel',xx,.71,s*.505,.006);box(g,1.24,.045,.045,'steel',0,1.14,s*.49,.008);box(g,.045,.045,.99,'steel',s*.6,1.14,0,.008)}label(g,'EMBALAGENS',.5,.11,0,.84,-.514,{size:28,rotation:Math.PI});return g}
@@ -58472,8 +58481,8 @@ for(const [text,x,z,w]of [['PLÁSTICO · ENTREGA',-1.85,1.86,3.8],['PAPELÃO · 
 // Large blue containers with film on the left; cardboard dumpster behind the paper bench.
 const vb=largeBin(videoLayout,-5.7,0,2.55,'blue');waste(vb,0,1.1,0,'film');
 const paperDumpster=largeBin(videoLayout,4.1,0,6.5,'blue');for(let i=0;i<5;i++)cardboard(paperDumpster,(i%2?1:-1)*.25,1+i*.055,0,i*.13,.6,.035,.4);
-for(const x of [-5.4,-4.1,-2.8,-1.5,-.2,1.1]){pallet(videoLayout,x,0,5.65);}
-for(const [text,x]of [['600 × 400 × 280',-4.1],['600 × 400 × 147',-1.5],['400 × 300',-.2],['300 × 200',1.1]])label(videoLayout,text,1.12,.13,x,.14,5.08,{size:26,rotation:Math.PI});
+for(const [x,z] of PALLET_SLOTS.slice(0,STATIC_PALLETS)){pallet(videoLayout,x,0,z);}
+// Etiquetas de dimensão dos pallets: criadas por rota em buildExactInventory.
 drum(videoLayout,7.25,0,6.8);drum(videoLayout,8.0,0,6.8);
 for(const x of [-5.7,4.2]){box(videoLayout,1.3,.008,1.15,'line',x,.004,6.5,0);}
 videoLayout.visible=false;
@@ -58486,12 +58495,17 @@ function addExactSheet(name,moves,vehicle,global=false){
  ops.push({n:++index,kind:'inventory',description:global?`Globais · ${INVENTORY.types[m.items[0][0]][1]} · ${m.count} caixa(s)`:`${name} · retirada ${m.number} · ${m.count} caixa(s)`,standard:m.seconds,normal:m.seconds,start:cursor,end:cursor+m.seconds,ids,source:m.source,originalDescription:m.originalDescription,q:m.count,f:1,code:'CX'});cursor+=m.seconds;
  }
  const unloadSeconds=cursor,unloadOps=ops.length;
+ const lots=[];
  for(let type=0;type<INVENTORY.types.length;type++){
  const list=units.filter(u=>u.type===type).map(u=>u.id),lot=type===0?2:type<4?3:1;
- for(let k=0;k<list.length;k+=lot){const ids=list.slice(k,k+lot),kind=type<4?'storage':'paper';
- const seconds=type<4?8:6;const o={n:++index,kind,description:`${type<4?'Guardar':'Abrir no dispositivo e descartar'} · ${INVENTORY.types[type][1]} · ${ids.length} caixa(s)`,standard:seconds,normal:seconds,start:cursor,end:cursor+seconds,ids,source:'Sequência visual após descarga · duração ilustrativa',q:ids.length,f:1,code:type<4?'GUARDAR':'PAPELÃO'};
+ for(let k=0;k<list.length;k+=lot)lots.push({type,ids:list.slice(k,k+lot)});}
+ // Guarda e papelão começam assim que o lote está na bancada: ordem pela retirada da última caixa do lote.
+ const lotReady=l=>Math.max(...l.ids.map(id=>units[id].op));
+ lots.sort((a,b)=>(a.type<4?0:1)-(b.type<4?0:1)||lotReady(a)-lotReady(b)||a.type-b.type||a.ids[0]-b.ids[0]);
+ for(const {type,ids} of lots){const kind=type<4?'storage':'paper';
+ const seconds=type<4?8:6;const o={n:++index,kind,description:`${type<4?'Guardar':'Abrir no dispositivo e descartar'} · ${INVENTORY.types[type][1]} · ${ids.length} caixa(s)`,standard:seconds,normal:seconds,start:cursor,end:cursor+seconds,ids,source:'Inicia assim que o lote chega à bancada, em paralelo com a descarga · duração ilustrativa',q:ids.length,f:1,code:type<4?'GUARDAR':'PAPELÃO'};
  ops.push(o);for(const id of ids)units[id].storeOp=index-1;cursor+=seconds;
- }}
+ }
  const jackStart=cursor;
  const jackDescriptions=['Operador vai buscar a paleteira hidráulica','Introduzir os garfos sob o pallet','Bombear o timão e elevar o pallet','Transportar o pallet carregado pelo corredor','Baixar o pallet na posição de arqueamento','Retirar e estacionar a paleteira'];
  [16,6,6,12,4,6].forEach((seconds,jackPhase)=>{ops.push({n:++index,kind:'jack',jackPhase,description:jackDescriptions[jackPhase],standard:seconds,normal:seconds,start:cursor,end:cursor+seconds,ids:[],source:'Movimentação de carga de referência com paleteira — duração ilustrativa',q:1,f:1,code:'PALETEIRA'});cursor+=seconds;});
@@ -58503,6 +58517,7 @@ function addExactSheet(name,moves,vehicle,global=false){
  ops.push({n:++index,kind:'driveOut',description:'Operador assume o volante e libera o rebocador',standard:6,normal:6,start:cursor,end:cursor+6,ids:[],source:'Saída ilustrativa — fora do tempo da planilha',q:1,f:1,code:'SAÍDA'});cursor+=6;
  const reference=({ 'ROTA A':[51,29.5], 'ROTA B':[22.6,32.5], 'ROTA C':[35.9,30], 'ROTA 24A':[74,27+2/3], 'ROTA 24B':[94.6,35]})[name]||[278.1,30+35/60];
  const sh={jackStart,strapStart,unloadSeconds,unloadOps,referenceSeconds:reference[0],cycleMinutes:reference[1],name,title:name,exact:true,global,units,vehicle,ops,standard:cursor,normal:cursor,quantity:1,subtotal:cursor,allowance:0,pages:[],sourceType:'inventory'};
+ scheduleExactSheet(sh);
  const i=MTM_SHEETS.length;MTM_SHEETS.push(sh);exactIndices.push(i);
  const o=document.createElement('option');o.value=i;o.textContent=`${name} — ${units.length} embalagens`;$('inventorySelect').append(o);
  const o2=o.cloneNode(true);$('sheetSelect').append(o2);return sh;
@@ -58510,6 +58525,48 @@ function addExactSheet(name,moves,vehicle,global=false){
 for(const r of INVENTORY.routes)addExactSheet(r.name,r.moves,r.vehicle);
 const globalMoves=[];exactTotals.forEach((q,type)=>{const lot=type===0?2:type<4?3:1;for(let left=q;left>0;left-=lot){const count=Math.min(lot,left);globalMoves.push({count,items:[[type,count]],seconds:8,source:'RESUMO DIRETORIA!A14:F26 · tempo ilustrativo',number:globalMoves.length+1})}});
 addExactSheet('GLOBAIS — todas as rotas',globalMoves,0,true);
+function buildOpTrips(sh){for(const op of sh.ops){op.trips=[];let trip=[];for(const id of op.ids){const t=sh.units[id].type,limit=t===0||t===4?2:3;if(trip.length&&(trip.length>=limit||sh.units[trip[0]].type!==t)){op.trips.push(trip);trip=[]}trip.push(id)}if(trip.length)op.trips.push(trip);if(!op.trips.length)op.trips=[[]];}}
+// Três operadores em paralelo: o operador 3 descarrega, a operadora 1 guarda o plástico e a operadora 2 abre o papelão.
+// Cada lote começa quando suas caixas estão na bancada; a descarga espera se não houver base livre (máx. STACK_LIMIT por pilha).
+function scheduleExactSheet(sh){
+ buildOpTrips(sh);const units=sh.units,ops=sh.ops,EPS=1e-7;
+ let cursor=0;for(const o of ops.filter(o=>o.kind==='driveIn'||o.kind==='dismount')){o.start=cursor;cursor+=o.standard;o.end=cursor;}
+ const unloadOps=ops.filter(o=>o.kind==='inventory'),storeOps=ops.filter(o=>o.kind==='storage'),paperOps=ops.filter(o=>o.kind==='paper');
+ const benchOf=u=>u.type<4?'plastic':'paper',cellUnits={plastic:BENCH_CELLS.plastic.map(()=>[]),paper:BENCH_CELLS.paper.map(()=>[])};
+ let seq=0;units.forEach(u=>{u.tUnload=u.tLand=u.tPick=u.tDone=Infinity;u.tOpen0=u.tOpen1=Infinity;u.cell=null;u.landSeq=0;});
+ const present=(b,c,t)=>cellUnits[b][c].filter(id=>units[id].tLand<=t+EPS&&units[id].tPick>t+EPS);
+ function chooseCell(u,t,overflow){const b=benchOf(u),own=b==='plastic'?u.type:u.type-4;let best=-1,score=Infinity;
+  BENCH_CELLS[b].forEach((c,i)=>{const here=present(b,i,t);if(!overflow&&here.some(id=>units[id].type!==u.type))return;if(!overflow&&here.length>=STACK_LIMIT)return;
+   const sc=Math.abs(c.seg-own)*100+here.length*10+i*.01;if(sc<score){score=sc;best=i;}});return best;}
+ function tryUnload(op,s,overflow){const D=op.standard/op.trips.length,placed=[];
+  for(let k=0;k<op.trips.length;k++){const L=s+(k+.78)*D;
+   for(const id of op.trips[k]){const u=units[id],c=chooseCell(u,L,overflow);
+    if(c<0){for(const pid of placed){const pu=units[pid];cellUnits[benchOf(pu)][pu.cell].pop();pu.cell=null;pu.tUnload=pu.tLand=Infinity;}return L;}
+    u.cell=c;u.tUnload=s+(k+.15)*D;u.tLand=L;u.landSeq=++seq;cellUnits[benchOf(u)][c].push(id);placed.push(id);}}
+  op.start=s;op.end=s+op.standard;return null;}
+ const readyAt=op=>{let m=0;for(const id of op.ids){const L=units[id].tLand;if(!Number.isFinite(L))return Infinity;m=Math.max(m,L);}return m;};
+ const lane={storage:{ops:storeOps,i:0,free:cursor},paper:{ops:paperOps,i:0,free:cursor}};
+ const candidate=l=>l.i<l.ops.length?Math.max(l.free,readyAt(l.ops[l.i])):Infinity;
+ function schedulePost(limit){const cs=candidate(lane.storage),cp=candidate(lane.paper),c=Math.min(cs,cp);if(!Number.isFinite(c)||c>limit)return false;
+  const l=cs<=cp?lane.storage:lane.paper,op=l.ops[l.i++],s=c,D=op.standard/op.trips.length;op.start=s;op.end=s+op.standard;l.free=op.end;
+  op.trips.forEach((trip,k)=>trip.forEach(id=>{const u=units[id];u.tPick=s+(k+.15)*D;u.tDone=s+(k+.78)*D;u.tOpen0=s+(k+.44)*D;u.tOpen1=s+(k+.58)*D;}));return true;}
+ let tU=cursor;
+ for(const op of unloadOps){
+  while(schedulePost(tU+op.standard));
+  let s=tU,overflow=false;
+  for(let guard=0;guard<5000;guard++){const fail=tryUnload(op,s,overflow);if(fail===null)break;
+   if(schedulePost(Infinity))continue;
+   const picks=units.filter(u=>Number.isFinite(u.tLand)&&Number.isFinite(u.tPick)&&u.tPick>fail+EPS).map(u=>u.tPick);
+   if(picks.length)s+=Math.min(...picks)-fail+.05;else overflow=true;}
+  tU=op.end;}
+ while(schedulePost(Infinity));
+ cursor=Math.max(tU,lane.storage.free,lane.paper.free,cursor);
+ for(const o of ops)if(!['driveIn','dismount','inventory','storage','paper'].includes(o.kind)){o.start=cursor;cursor+=o.standard;o.end=cursor;}
+ sh.unloadSeconds=unloadOps.length?unloadOps.at(-1).end:cursor;sh.jackStart=ops.find(o=>o.kind==='jack').start;sh.strapStart=ops.find(o=>o.kind==='strap').start;sh.standard=sh.subtotal=cursor;
+}
+function exactUnitState(u,t){if(t<u.tUnload)return'carreta';if(t<u.tLand)return'transporte';if(t<u.tPick)return'bancada';if(t<u.tDone)return u.type>=4&&t>=u.tOpen0&&t<u.tOpen1?'abertura':'transporte';return u.type<4?'armazenada':'descartada';}
+function refreshBenchPositions(sh,t){for(const u of sh.units){if(u.cell==null||!u.source)continue;const plastic=u.type<4,c=BENCH_CELLS[plastic?'plastic':'paper'][u.cell];let y=.98;
+ for(const o of sh.units)if(o!==u&&o.cell===u.cell&&(o.type<4)===plastic&&o.landSeq<u.landSeq&&o.tPick>t)y+=INVENTORY.types[o.type][2][2]/1000;u.source.set(c.x,y,c.z);}}
 function buildExactInventory(sh){
  exactRoot.clear();exactMeshes.length=0;exactUnits=sh.units;exactSheet=sh;
  const perType=Array(9).fill(0);
@@ -58518,17 +58575,26 @@ function buildExactInventory(sh){
  else{ob=makePaperBox(exactRoot,w,h,d);}
  const n=perType[unit.type]++;
  // Fixed delivery addresses by material. Four plastic model bays along the long bench.
- if(unit.type<4){const col=unit.type;unit.source=vec(-4.55+col*1.23+(n%2)*.60,.98+Math.floor(n/4)*h,2.23+Math.floor(n%4/2)*.42);}
- else {const p=unit.type-4,slot=[0,1,2,3,4][p];unit.source=vec(2.80+(n%2)*.60,.98+Math.floor(n/2)*h,3.45+slot*.46);}
- const storageX=[-5.7,-1.8,-.5,.8][unit.type];
- if(unit.type<4){const slots=unit.type===0?12:4,cell=n%slots;unit.storage=vec(storageX+Math.floor(cell/4)*1.3+(cell%2)*.60,.19+Math.floor(n/slots)*h,5.45+Math.floor(cell%4/2)*.42);}else{unit.storage=vec(4.1+((n%2)-.5)*.38,.38+n*.012,6.5);}
+ // Base na bancada definida pelo cronograma; a altura da pilha é recalculada a cada quadro.
+ const bc=BENCH_CELLS[unit.type<4?'plastic':'paper'][unit.cell??0];unit.source=vec(bc.x,.98,bc.z);
+ if(unit.type>=4)unit.storage=vec(4.1+((n%2)-.5)*.38,.38+n*.012,6.5);
  unit.dest={tr:Math.floor(unit.id/8)%2,x:(unit.id%2?1:-1)*.30,z:-.65+Math.floor(unit.id%8/2)*.43,y:.44};
  ob.userData.fullScaleY=ob.scale.y;exactMeshes.push(ob);
  }
  // Load the earliest pickup on top. Each unit has its own initial and final location.
  const heights={};for(let i=exactUnits.length-1;i>=0;i--){const unit=exactUnits[i],d=unit.dest,key=[d.tr,d.x,d.z].join(',');d.y=.44+(heights[key]||0);heights[key]=(heights[key]||0)+INVENTORY.types[unit.type][2][2]/1000;}
  // Break high recorded counts into visible trips; source row quantities and clocks stay intact.
- for(const op of sh.ops){op.trips=[];let trip=[];for(const id of op.ids){const t=sh.units[id].type,limit=t===0||t===4?2:t<4?3:3;if(trip.length&&(trip.length>=limit||sh.units[trip[0]].type!==t)){op.trips.push(trip);trip=[]}trip.push(id)}if(trip.length)op.trips.push(trip);if(!op.trips.length)op.trips=[[]];}
+ buildOpTrips(sh);
+ // Pallets de destino: cada tipo enche um pallet (4 bases × STACK_LIMIT camadas) antes de abrir o próximo.
+ const storeOrder=sh.ops.filter(o=>o.kind==='storage').sort((a,b)=>a.start-b.start).flatMap(o=>o.trips.flat());
+ const typeCount=[],typePallets=[],spots=[];
+ for(const id of storeOrder){const unit=sh.units[id],t=unit.type,k=typeCount[t]||0;typeCount[t]=k+1;const pi=Math.floor(k/(4*STACK_LIMIT));typePallets[t]=typePallets[t]||[];
+  if(!typePallets[t][pi]){const index=Math.min(spots.length,PALLET_SLOTS.length-1);typePallets[t][pi]=PALLET_SLOTS[index];spots.push({index,type:t});}
+  const [px,pz]=typePallets[t][pi],cell=k%4,layer=Math.floor(k/4)%STACK_LIMIT,h=INVENTORY.types[t][2][2]/1000,x=px+((cell%2)-.5)*.60;
+  unit.storage=vec(x,.19+layer*h,pz+(Math.floor(cell/2)-.5)*.42);unit.storageStand=[x,pz-1];}
+ sh.extraPalletSpots=spots.filter(s=>s.index>=STATIC_PALLETS).map(s=>PALLET_SLOTS[s.index]);
+ for(const {index,type} of spots){const [x,z]=PALLET_SLOTS[index];if(index>=STATIC_PALLETS)pallet(exactRoot,x,0,z);label(exactRoot,INVENTORY.types[type][2].join(' × '),1.12,.13,x,.14,z-.57,{size:26,rotation:Math.PI});}
+ walkingGraphs.clear();walkingPaths.clear();
  const pla=exactUnits.filter(u=>u.type<4).length;
  $('inventorySummary').textContent=`${sh.name}: ${exactUnits.length} embalagens (${pla} plásticas + ${exactUnits.length-pla} papelão).`;
 }
@@ -58538,7 +58604,7 @@ function walkingObstacles(placed=false){
  const items=[],add=(name,x,z,w,d)=>items.push({name,x1:x-w/2,x2:x+w/2,z1:z-d/2,z2:z+d/2});
  add('bancada_plastico',-1.84,2.45,6.14,1.02);add('bancada_papelao',3.1,4.91,1.02,3.68);
  add('recipiente_plastico',-5.7,2.55,1.26,1.05);add('recipiente_papelao',4.1,6.5,1.26,1.05);
- for(const x of [-5.4,-4.1,-2.8,-1.5,-.2,1.1])add('pallet_posicao',x,5.65,1.2,1);
+ for(const [x,z] of PALLET_SLOTS.slice(0,STATIC_PALLETS).concat(exactSheet?.extraPalletSpots||[]))add('pallet_posicao',x,z,1.2,1);
  for(const x of [-9.4,-4.9,.2,5.3,10.4])for(const z of [10.6,13.7,16.8,20,23.2])add('pallet_estoque',x,z,1.26,1.06);
  add('dispositivo_abertura',5.6,4.55,1.14,.74);add('sala',12.4,5.8,2.8,3.4);
  for(const x of [7.25,8])add('tambor',x,6.8,.64,.64);
@@ -58561,7 +58627,7 @@ function walkingLineClear(a,b,rects){
  return true;
 }
 function walkingGraph(placed){
- const key=(placed?'placed':'parked')+':'+MTM_SHEETS[sheetIndex].vehicle;if(walkingGraphs.has(key))return walkingGraphs.get(key);
+ const key=(placed?'placed':'parked')+':'+MTM_SHEETS[sheetIndex].vehicle+':'+(exactSheet?.extraPalletSpots||[]).join(';');if(walkingGraphs.has(key))return walkingGraphs.get(key);
  const rects=walkingObstacles(placed).map(r=>({...r,x1:r.x1-WALK_CLEARANCE,x2:r.x2+WALK_CLEARANCE,z1:r.z1-WALK_CLEARANCE,z2:r.z2+WALK_CLEARANCE}));
  const nodes=[],free=p=>!rects.some(r=>walkingInside(p,r))&&p[0]>-13.3&&p[0]<13.3&&p[1]>-7&&p[1]<25.7;
  for(const r of rects)for(const x of [r.x1-.025,r.x2+.025])for(const z of [r.z1-.025,r.z2+.025])if(free([x,z]))nodes.push([x,z]);
@@ -58591,19 +58657,14 @@ function planWalkingPath(points){
 }
 
 const easeMotion=t=>{t=clamp(t,0,1);return t*t*(3-2*t)};
-function exactTrip(){const {sheet:sh,op,fraction:u}=leafState();const ti=Math.min(op.trips.length-1,Math.floor(u*op.trips.length)),phase=Math.min(1,u*op.trips.length-ti);return{sh,op,ti,phase,ids:op.trips[ti]};}
+function exactTrip(){const {sheet:sh,op,fraction:u,local}=leafState();const ti=Math.min(op.trips.length-1,Math.floor(u*op.trips.length)),phase=Math.min(1,u*op.trips.length-ti);return{sh,op,ti,phase,ids:op.trips[ti],local};}
 function exactSnapshot(){
  const sh=MTM_SHEETS[sheetIndex];if(!sh.exact)return null;
- const {op,ti,phase,ids}=exactTrip(),completed=time>=CYCLE;
+ const {op,ti,phase,ids,local}=exactTrip(),completed=time>=CYCLE;
  const deliveredState=unit=>unit.type<4?'armazenada':'descartada';
- const states=sh.units.map(unit=>{
- if(completed||unit.storeOp<op.n-1)return deliveredState(unit);
- const operation=op.n-1;
- if(operation===unit.storeOp||operation===unit.op){const tr=op.trips.findIndex(a=>a.includes(unit.id)),done=tr<ti||tr===ti&&phase>=.78,carry=tr===ti&&phase>=.15&&phase<.78;
- if(operation===unit.storeOp){if(op.kind==='paper'&&tr===ti&&phase>=.44&&phase<.58)return 'abertura';return done?deliveredState(unit):carry?'transporte':'bancada';}return done?'bancada':carry?'transporte':'carreta';}
- return unit.op<operation?'bancada':'carreta';});
+ const states=sh.units.map(unit=>completed?deliveredState(unit):exactUnitState(unit,local));
  const count=state=>states.filter(s=>s===state).length;
- return {name:sh.name,total:sh.units.length,source:count('carreta'),carrying:count('transporte'),opening:count('abertura'),bench:count('bancada'),stored:count('armazenada'),discarded:count('descartada'),delivered:count('armazenada')+count('descartada'),unloaded:sh.units.filter((unit,k)=>states[k]!=='carreta'&&!(unit.op===op.n-1&&states[k]==='transporte')).length,phase:op.kind,trip:ti+1,trips:op.trips.length,byType:INVENTORY.types.map((type,i)=>({material:type[0],name:type[1],dimensions:type[2],planned:sh.units.filter(u=>u.type===i).length,delivered:sh.units.filter((u,k)=>u.type===i&&['armazenada','descartada'].includes(states[k])).length})),states};
+ return {name:sh.name,total:sh.units.length,source:count('carreta'),carrying:count('transporte'),opening:count('abertura'),bench:count('bancada'),stored:count('armazenada'),discarded:count('descartada'),delivered:count('armazenada')+count('descartada'),unloaded:sh.units.filter(unit=>completed||local>=unit.tLand).length,phase:op.kind,trip:ti+1,trips:op.trips.length,byType:INVENTORY.types.map((type,i)=>({material:type[0],name:type[1],dimensions:type[2],planned:sh.units.filter(u=>u.type===i).length,delivered:sh.units.filter((u,k)=>u.type===i&&['armazenada','descartada'].includes(states[k])).length})),states};
 
 }
 function itemOnTrailer(unit,v){const d=unit.dest;return v.trailers[d.tr].root.localToWorld(vec(d.x,d.y,d.z));}
@@ -58611,7 +58672,7 @@ function exactMotionGeometry(sh,ids,v,kind='inventory'){
  const unit=sh.units[ids[0]],isUnload=kind==='inventory',origin=isUnload?itemOnTrailer(unit,v):unit.source.clone(),target=isUnload?unit.source.clone():unit.storage.clone();
  let start,end,path,startAngle,endAngle;
  if(isUnload){start=[origin.x,.99];end=unit.type<4?[target.x,1.50]:[2.10,target.z];path=unit.type<4?[start,[end[0],.99],end]:[start,[2.10,.99],end];startAngle=0;endAngle=unit.type<4?Math.PI:-Math.PI/2;}
- else if(kind==='storage'){start=[origin.x,3.35];end=[target.x,4.65];path=[start,[start[0],4.1],[end[0],4.1],end];startAngle=0;endAngle=Math.PI;}
+ else if(kind==='storage'){start=[origin.x,3.35];end=unit.storageStand||[target.x,target.z-1];path=[start,[start[0],4.1],end];startAngle=0;endAngle=Math.PI;}
  else {start=[4.08,origin.z];end=[4.1,5.55];path=[start,[4.8,origin.z],[4.8,5.55],end];startAngle=Math.PI/2;endAngle=Math.PI;}
  path=planWalkingPath(path);return{origin,target,start,end,path,startAngle,endAngle,isUnload};
 }
@@ -58623,7 +58684,8 @@ function updateExact(){
  Object.assign(forklift,{x:11.8,z:-4.5,angle:Math.PI});sync(forklift);forklift.root.visible=true;
  tugYellowPaint.color.set(sh.name==='ROTA 24B'?'#df8d22':'#e6b427');
  for(const veh of vehicles){veh.processActive=veh===v;for(const t of veh.trailers)t.cargo.visible=false;}
- const {op,ti,phase:u,ids}=exactTrip();actorIndex=op.kind==='storage'?0:op.kind==='paper'?1:op.kind==='strap'?2:2;
+ const {op,ti,phase:u,ids,local}=exactTrip();actorIndex=op.kind==='storage'?0:op.kind==='paper'?1:op.kind==='strap'?2:2;
+ refreshBenchPositions(sh,time>=CYCLE?Infinity:local);
  palletContext(sh,op);strapTool.visible=looseStrap.visible=false;
  if(['driveIn','driveOut','dismount','mount','strap','jack'].includes(op.kind)){
  if(op.kind==='jack'){updatePalletTransport(sh,op,u);}else if(op.kind==='dismount'||op.kind==='mount'){driverTransition(workers[2],v,u,op.kind==='mount',sh);}else if(op.kind!=='strap'){const x=op.kind==='driveIn'?1.65+4*easeMotion(u):5.65+4*easeMotion(u);Object.assign(v,{x});straightTrailers(v);seatOperator(workers[actorIndex],v);}else updateStrapping(sh,op,u);
@@ -58631,26 +58693,39 @@ function updateExact(){
  if(op.kind==='driveOut'){strapStation.visible=spool.visible=true;processStraps.forEach(g=>g.visible=true);}
  for(const veh of vehicles)animateVehicle(veh,0,time);return;
  }
- if(op.kind==='paper'){updatePaperOpening(sh,op,u,ids,v);return;}
- scene.updateMatrixWorld(true);const motion=exactMotionGeometry(sh,ids,v,op.kind),p=workers[actorIndex];tracePath(motion.path);
+ // Descarga, guarda e papelão acontecem ao mesmo tempo, cada um com seu operador.
+ scene.updateMatrixWorld(true);const snapshot=exactSnapshot();
+ sh.units.forEach((unit,i)=>{const ob=exactMeshes[i],state=snapshot.states[i];ob.visible=true;ob.scale.y=ob.userData.fullScaleY;ob.rotation.set(0,state==='carreta'?v.angle:0,0);paperFold(ob,state==='descartada'?1:0);ob.position.copy(state==='carreta'?itemOnTrailer(unit,v):state==='bancada'?unit.source:unit.storage);ob.position.y+=ob.userData.base;});
+ const started=local>=(sh.ops.find(o=>o.kind==='dismount')?.end??0);
+ for(const kind of ['inventory','paper','storage']){
+  const active=sh.ops.find(o=>o.kind===kind&&o.start<=local&&local<o.end);
+  if(!active){const next=sh.ops.find(o=>o.kind===kind&&o.start>local);if(!next||!started)continue;
+   const p=workers[kind==='storage'?0:kind==='paper'?1:2];
+   if(kind==='paper')pPosition(p,4.08,sh.units[next.ids[0]].source.z,Math.PI/2);else{const g=exactMotionGeometry(sh,next.trips[0],v,kind);pPosition(p,...g.start,g.startAngle);}
+   continue;}
+  const D=(active.end-active.start)/active.trips.length,k=Math.min(active.trips.length-1,Math.floor((local-active.start)/D)),lu=clamp((local-active.start-k*D)/D,0,1);
+  if(kind==='paper')updatePaperOpening(sh,active,lu,active.trips[k],v,snapshot.states);else animateExactCarry(sh,active,k,lu,active.trips[k],v,snapshot.states);
+ }
+ for(const veh of vehicles)animateVehicle(veh,0,time);
+}
+function animateExactCarry(sh,op,ti,u,ids,v,states){
+ scene.updateMatrixWorld(true);const motion=exactMotionGeometry(sh,ids,v,op.kind),p=workers[op.kind==='storage'?0:2];tracePath(motion.path);
  const walkStart=.29,walkEnd=.61;
  if(u<walkStart){pPosition(p,...motion.start,motion.startAngle);const bend=Math.sin(Math.PI*clamp(u/walkStart,0,1))*.22;p.body.rotation.x=bend;p.body.position.y=.84-bend*.13;p.legs.forEach(l=>{l.hip.rotation.x=-bend*.35;l.knee.rotation.x=bend*.7;});if(p.head)p.head.rotation.x=.18;}
  else if(u<walkEnd){const q=easeMotion((u-walkStart)/(walkEnd-walkStart));naturalWalk(p,motion.path,q,true);const inTurn=easeMotion((u-walkStart)/.06),outTurn=easeMotion((u-(walkEnd-.06))/.06);let angle=p.root.rotation.y;angle=motion.startAngle+angleDiff(angle,motion.startAngle)*inTurn;angle+=angleDiff(motion.endAngle,angle)*outTurn;p.root.rotation.y=angle;}
  else if(u<.84){pPosition(p,...motion.end,motion.endAngle);p.body.rotation.x=Math.sin(Math.PI*(u-.61)/.23)*.14;if(p.head)p.head.rotation.x=.12;}
- else{const nextTrip=op.trips[ti+1],nextOp=sh.ops[op.n],sameActor=nextOp?.kind===op.kind;const nextIds=nextTrip||(sameActor?nextOp.trips[0]:null);const nextStart=nextIds?exactMotionGeometry(sh,nextIds,v,op.kind).start:op.kind==='inventory'?[5.8,1.1]:[-1.2,3.7];const returnPath=motion.isUnload?[motion.end,[motion.end[0],.99],nextStart]:[motion.end,[motion.end[0],4.1],[nextStart[0],4.1],nextStart];naturalWalk(p,returnPath,easeMotion((u-.84)/.16));}
- scene.updateMatrixWorld(true);const snapshot=exactSnapshot();let handTarget=null;
- sh.units.forEach((unit,i)=>{const ob=exactMeshes[i],state=snapshot.states[i];ob.visible=true;ob.rotation.set(0,0,0);const origin=motion.isUnload?itemOnTrailer(unit,v):unit.source.clone(),destination=motion.isUnload?unit.source:unit.storage;let pos;ob.scale.y=ob.userData.fullScaleY;
- if(state==='bancada')pos=unit.source.clone();else if(state==='carreta')pos=itemOnTrailer(unit,v);else if(state==='armazenada'||state==='descartada'){pos=unit.storage.clone();}
- else{const j=ids.indexOf(i),height=ids.slice(0,j).reduce((sum,id)=>sum+INVENTORY.types[sh.units[id].type][2][2]/1000,0);const carry=vec(0,1.02+height,-.43).applyAxisAngle(up,p.root.rotation.y).add(p.root.position);carry.y+=p.body.position.y-.84;
+ else{const nextTrip=op.trips[ti+1],nextOp=sh.ops.find(o=>o.kind===op.kind&&o.n>op.n),sameActor=!!nextOp;const nextIds=nextTrip||(sameActor?nextOp.trips[0]:null);const nextStart=nextIds?exactMotionGeometry(sh,nextIds,v,op.kind).start:op.kind==='inventory'?[5.8,1.1]:[-1.2,3.7];const returnPath=motion.isUnload?[motion.end,[motion.end[0],.99],nextStart]:[motion.end,[motion.end[0],4.1],[nextStart[0],4.1],nextStart];naturalWalk(p,returnPath,easeMotion((u-.84)/.16));}
+ scene.updateMatrixWorld(true);let handTarget=null;
+ for(const i of ids){const unit=sh.units[i],ob=exactMeshes[i],state=states[i];if(state!=='transporte')continue;ob.rotation.set(0,0,0);const origin=motion.isUnload?itemOnTrailer(unit,v):unit.source.clone(),destination=motion.isUnload?unit.source:unit.storage;let pos;
+ {const j=ids.indexOf(i),height=ids.slice(0,j).reduce((sum,id)=>sum+INVENTORY.types[sh.units[id].type][2][2]/1000,0);const carry=vec(0,1.02+height,-.43).applyAxisAngle(up,p.root.rotation.y).add(p.root.position);carry.y+=p.body.position.y-.84;
  if(u<.29){const t=easeMotion((u-.15)/.14);pos=origin.clone().lerp(carry,t);pos.y+=Math.sin(t*Math.PI)*.045;const startRotation=motion.isUnload?v.angle:0;ob.rotation.y=startRotation+angleDiff(p.root.rotation.y,startRotation)*t;}
  else if(u>=.61){const t=easeMotion((u-.61)/.17);pos=carry.clone().lerp(destination,t);pos.y+=Math.sin(t*Math.PI)*.045;ob.rotation.y=p.root.rotation.y*(1-t);}
  else{pos=carry;ob.rotation.y=p.root.rotation.y;}
  if(j===0)handTarget=pos.clone().add(vec(0,.08,0));}
- paperFold(ob,state==='descartada'?1:(op.kind==='paper'&&ids.includes(i)&&state==='transporte'?clamp((u-.15)/.14,0,1):0));ob.position.copy(pos);ob.position.y+=ob.userData.base;if(state==='carreta')ob.rotation.y=v.angle;
- });
+ ob.position.copy(pos);ob.position.y+=ob.userData.base;
+ }
  if(u<.15){handTarget=motion.origin.clone().add(vec(0,.08,0));}else if(u>=.78&&u<.84){handTarget=motion.target.clone().add(vec(0,.08,0));}
  if(handTarget)aimHands(p,handTarget,INVENTORY.types[sh.units[ids[0]].type][2][0]/1000+.02);
- for(const veh of vehicles)animateVehicle(veh,0,time);
 }
 function focusExact(){setCamera('orbit');controls.target.set(.3,1.15,2.25);camera.position.set(-6.8,5.1,-8.5);camera.lookAt(controls.target);controls.update();}
 function updateExactUI(){const sh=MTM_SHEETS[sheetIndex],isExact=!!sh.exact;
@@ -58681,7 +58756,7 @@ $('jumpStorage').onclick=()=>{const sh=MTM_SHEETS[sheetIndex];if(sh.exact){seek(
 $('videoReference').onclick=()=>$('videoReferenceDialog').showModal();
 function drawVideoMap(){const c=mapCtx,w=420,h=470,s=11,mx=x=>210-x*s,mz=z=>112+z*s;c.clearRect(0,0,w,h);c.fillStyle='#1c2c29';c.fillRect(0,0,w,h);
  const rect=(x,z,ww,dd,color)=>{c.fillStyle=color;c.fillRect(mx(x+ww/2),mz(z-dd/2),ww*s,dd*s)};
- c.strokeStyle='#87968b';c.strokeRect(mx(14),mz(-8),28*s,34*s);for(const x of [-9.4,-4.9,.2,5.3,10.4])for(const z of [10.6,13.7,16.8,20,23.2])rect(x,z,1.2,1,'#48667c');c.strokeStyle='#9a6845';for(const x of [-11,-6.8,-1.8,3.2,8.4,13.2]){c.beginPath();c.moveTo(mx(x),mz(9));c.lineTo(mx(x),mz(26));c.stroke();}rect(-1.84,2.45,6.15,1,'#778487');rect(3.1,4.91,1,3.46,'#9b8263');for(const x of [-5.4,-4.1,-2.8,-1.5,-.2,1.1])rect(x,5.65,1.15,1,'#4a7292');rect(4.1,6.5,1.2,1,'#aa8856');
+ c.strokeStyle='#87968b';c.strokeRect(mx(14),mz(-8),28*s,34*s);for(const x of [-9.4,-4.9,.2,5.3,10.4])for(const z of [10.6,13.7,16.8,20,23.2])rect(x,z,1.2,1,'#48667c');c.strokeStyle='#9a6845';for(const x of [-11,-6.8,-1.8,3.2,8.4,13.2]){c.beginPath();c.moveTo(mx(x),mz(9));c.lineTo(mx(x),mz(26));c.stroke();}rect(-1.84,2.45,6.15,1,'#778487');rect(3.1,4.91,1,3.46,'#9b8263');for(const [x,z] of PALLET_SLOTS.slice(0,STATIC_PALLETS).concat(exactSheet?.extraPalletSpots||[]))rect(x,z,1.15,1,'#4a7292');rect(4.1,6.5,1.2,1,'#aa8856');
  rect(5.6,4.55,1.14,.74,'#32b6c6');rect(12.4,5.8,2.8,3.4,'#e4e4d9');c.font='10px Arial';c.fillStyle='#e4e4d9';c.fillText('SALA',mx(13.8),mz(5.9));c.fillText('ABRIR',mx(7.7),mz(4.1));c.font='12px Arial';c.fillStyle='#dcebd5';c.fillText('PLÁSTICO',mx(-3.6),mz(2.2));c.fillText('PAPELÃO',mx(2.5),mz(3.0));c.fillText('POSIÇÕES DE ARMAZENAGEM',mx(-6),mz(7));c.fillText('CARRETINHAS',mx(-1),mz(-1.0));
  rect(-14,-4,.35,4.2,'#1c2c29');c.strokeStyle='#5d8bd0';c.beginPath();c.moveTo(mx(-14),mz(-6.1));c.lineTo(mx(-15.7),mz(-6.1));c.moveTo(mx(-14),mz(-1.9));c.lineTo(mx(-15.7),mz(-1.9));c.stroke();c.fillStyle='#bdd4ed';c.font='10px Arial';c.fillText('PORTA',mx(-10.6),mz(-4));
  const v=vehicles[selected];for(const t of v.trailers)rect(t.x,t.z,1.91,1.22,'#909995');rect(v.x,v.z,2.1,1.15,v.id?'#db5761':'#e5b537');
@@ -58784,7 +58859,7 @@ function updatePalletTransport(sh,op,u){
 $('jumpPallet').onclick=()=>{const sh=MTM_SHEETS[sheetIndex];seek(sh.jackStart);playing=true;focusPalletContext();};
 function focusPalletContext(){setCamera('orbit');camera.position.set(8,5.8,18.5);controls.target.set(6.5,1.2,10.5);camera.lookAt(controls.target);controls.update();}
 
-function updatePaperOpening(sh,op,u,ids,v){
+function updatePaperOpening(sh,op,u,ids,v,states){
  const p=workers[1],unit=sh.units[ids[0]],start=[4.08,unit.source.z],end=[4.1,5.55];
  const toFixture=planWalkingPath([start,[4.62,start[1]],[4.62,4.55],openingOperator]);
  const toBin=planWalkingPath([openingOperator,[4.62,5.55],end]);
@@ -58797,12 +58872,12 @@ function updatePaperOpening(sh,op,u,ids,v){
  else if(u<.62){pPosition(p,...openingOperator,-Math.PI/2);p.body.rotation.x=.08+Math.sin(clamp((u-.44)/.14,0,1)*Math.PI)*.07;if(p.head)p.head.rotation.x=.20;}
  else if(u<.71)walk(toBin,(u-.62)/.09,-Math.PI/2,Math.PI);
  else if(u<.84){pPosition(p,...end,Math.PI);p.body.rotation.x=Math.sin((u-.71)/.13*Math.PI)*.12;}
- else{const nextOp=sh.ops[op.n],next=nextOp?.kind==='paper'?sh.units[nextOp.ids[0]].source:unit.source;walk([end,[4.62,5.55],[4.62,next.z],[4.08,next.z]],(u-.84)/.16,Math.PI,Math.PI/2);}
+ else{const nextOp=sh.ops.find(o=>o.kind==='paper'&&o.n>op.n),next=nextOp?sh.units[nextOp.ids[0]].source:unit.source;walk([end,[4.62,5.55],[4.62,next.z],[4.08,next.z]],(u-.84)/.16,Math.PI,Math.PI/2);}
  tracePath([...toFixture,...toBin.slice(1)]);scene.updateMatrixWorld(true);
- const sn=exactSnapshot(),carry=vec(0,1.045,-.43).applyAxisAngle(up,p.root.rotation.y).add(p.root.position);
+ const carry=vec(0,1.045,-.43).applyAxisAngle(up,p.root.rotation.y).add(p.root.position);
  let handTarget=null;
- sh.units.forEach((item,i)=>{const ob=exactMeshes[i],state=sn.states[i];ob.visible=true;ob.scale.y=ob.userData.fullScaleY;ob.rotation.set(0,0,0);
-  let pos=state==='carreta'?itemOnTrailer(item,v):state==='bancada'?item.source.clone():item.storage.clone(),fold=state==='descartada'?1:0;
+ [unit.id].forEach(i=>{const item=sh.units[i],ob=exactMeshes[i],state=states[i];if(state!=='transporte'&&state!=='abertura')return;ob.rotation.set(0,0,0);
+  let pos=item.storage.clone(),fold=0;
   if(i===unit.id&&u>=.15&&u<.78){
    fold=easeMotion((u-.44)/.14);
    if(u<.23){const t=easeMotion((u-.15)/.08);pos=item.source.clone().lerp(carry,t);ob.rotation.y=p.root.rotation.y*t;}
@@ -58819,7 +58894,6 @@ function updatePaperOpening(sh,op,u,ids,v){
  if(u<.15)handTarget=unit.source.clone().add(vec(0,.08,0));
  if(u>=.78&&u<.84)handTarget=unit.storage.clone().add(vec(0,.08,0));
  if(handTarget)aimHands(p,handTarget,INVENTORY.types[unit.type][2][0]/1000+.02);
- for(const veh of vehicles)animateVehicle(veh,0,time);
 }
 function focusOpening(){setCamera('orbit');camera.position.set(0,5.7,-9.4);controls.target.set(-2,1.1,5.8);camera.lookAt(controls.target);controls.update();}
 $('jumpOpening').onclick=()=>{const sh=MTM_SHEETS[sheetIndex],op=sh.ops.find(o=>o.kind==='paper');if(op){seek(op.start);playing=true;}else showToast('Esta rota não contém embalagens de papelão.');focusOpening();};
@@ -58875,9 +58949,9 @@ function applyPlanToSheet(sh,r){
  for(const op of sh.ops){
   if(op.kind==='storage'){const type=sh.units[op.ids[0]].type,row=calc.rows[type];op.standard=r.method==='mtm'?calc.storageLot+(r.includePrep?op.ids.length*calc.prepUnit:0):row.storage/row.quantity*op.ids.length;op.source=r.method==='mtm'?`MTM p. 12–13 · ${op.ids.length} caixa(s) · 1 lote · ${routeNumber(r.distance)} m ida + volta · ${routeNumber(r.allowance)}%${r.includePrep?' · inclui preparação rateada por caixa':''}`:'PÓS-ENTREGA!C32:F34 · quantidade × segundos observados por caixa'+(type===1?' · média baixa: estimativa pela média geral 69/17':'');}
   if(op.kind==='paper'){op.standard=r.method==='mtm'?calc.paperUnit:109/25;op.source=r.method==='mtm'?`MTM p. 14–16 · média ponderada provisória do método · ${routeNumber(calc.paperUnit)} s por unidade equivalente`:'PÓS-ENTREGA!C43:F43 · 109 s / 25 caixas = 4,36 s por caixa';}
-  op.normal=['storage','paper'].includes(op.kind)&&r.method==='mtm'?op.standard/factor:op.standard;op.start=cursor;cursor+=op.standard;op.end=cursor;
+  op.normal=['storage','paper'].includes(op.kind)&&r.method==='mtm'?op.standard/factor:op.standard;
  }
- sh.standard=sh.subtotal=cursor;sh.normal=routeSum(sh.ops.map(o=>o.normal));sh.unloadSeconds=sh.ops.filter(o=>['driveIn','dismount','inventory'].includes(o.kind)).at(-1).end;sh.jackStart=sh.ops.find(o=>o.kind==='jack').start;sh.strapStart=sh.ops.find(o=>o.kind==='strap').start;
+ scheduleExactSheet(sh);sh.normal=routeSum(sh.ops.map(o=>o.normal));sh.unloadSeconds=sh.ops.filter(o=>['driveIn','dismount','inventory'].includes(o.kind)).at(-1).end;sh.jackStart=sh.ops.find(o=>o.kind==='jack').start;sh.strapStart=sh.ops.find(o=>o.kind==='strap').start;
  sh.routePlan=cloneRoute(r);sh.routeCalculation=calc;sh.referenceSeconds=calc.recordedUnload?originalReference[r.baseKey]:calc.unload;sh.cycleMinutes=r.cycleMinutes;
 }
 function rebuildRouteSheets(selectedId=null,initial=false){
